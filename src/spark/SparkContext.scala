@@ -1,5 +1,7 @@
 package spark
+import java.io._
 import java.util.concurrent.atomic.AtomicInteger
+import scala.collection.mutable.HashMap
 import spark.scheduler.local.LocalScheduler
 import scala.reflect.ClassTag
 import spark.scheduler.TaskScheduler
@@ -9,7 +11,8 @@ import spark.scheduler.TaskScheduler
  */
 class SparkContext(master: String, frameworkName: String) {
   private var nextRddId = new AtomicInteger(0)
-
+  private[spark] val addedFiles = HashMap[String, Long]()
+  private[spark] val addedJars = HashMap[String, Long]()
   /** Register a new RDD, returning its RDD ID */
   private[spark] def newRddId(): Int = nextRddId.getAndIncrement()
    // Create and start the scheduler
