@@ -3,6 +3,6 @@ import scala.reflect.ClassTag
 /**
  * @author guotong
  */
-class RDD [T: ClassTag](@transient sc: SparkContext)extends Serializable{
-  
+abstract class RDD [T: ClassTag](@transient sc: SparkContext)extends Serializable{
+    val id = sc.newRddId()
 }
