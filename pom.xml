@@ -100,17 +100,7 @@
         <enabled>false</enabled>
       </snapshots>
     </repository>
-    <repository>
-      <id>twitter4j-repo</id>
-      <name>Twitter4J Repository</name>
-      <url>http://twitter4j.org/maven2/</url>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
+   
   </repositories>
   <pluginRepositories>
     <pluginRepository>
@@ -232,8 +222,8 @@
       </dependency>
       <dependency>
         <groupId>cc.spray</groupId>
-        <artifactId>spray-json_${scala.version}</artifactId>
-        <version>${spray.json.version}</version>
+        <artifactId>spray-json-2.11</artifactId>
+        <version>2.11</version>
       </dependency>
       <dependency>
         <groupId>org.tomdz.twirl</groupId>
