@@ -2,7 +2,6 @@ package spark.deploy.master
 
 import akka.actor._
 import akka.actor.Terminated
-import akka.remote.{RemoteClientLifeCycleEvent, RemoteClientDisconnected, RemoteClientShutdown}
 
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -10,7 +9,8 @@ import java.util.Date
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 
 import spark.deploy._
-import spark.{Logging, SparkException, Utils}
+import spark.{Logging, SparkException}
+import spark.util.Utils
 import spark.util.AkkaUtils
 
 
@@ -35,19 +35,9 @@ private[spark] class Master(ip: String, port: Int, webUiPort: Int) extends Actor
     logInfo("Starting Spark master at spark://" + ip + ":" + port)
     // Listen for remote client disconnection events, since they don't go through Akka's watch()
     context.system.eventStream.subscribe(self, classOf[RemoteClientLifeCycleEvent])
-    startWebUi()
   }
 
-  def startWebUi() {
-    val webUi = new MasterWebUI(context.system, self)
-    try {
-      AkkaUtils.startSprayServer(context.system, "0.0.0.0", webUiPort, webUi.handler)
-    } catch {
-      case e: Exception =>
-        logError("Failed to create web UI", e)
-        System.exit(1)
-    }
-  }
+ 
 
   override def receive = {
     case RegisterWorker(id, host, workerPort, cores, memory, worker_webUiPort) => {
