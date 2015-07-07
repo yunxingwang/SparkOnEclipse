@@ -26,10 +26,10 @@ import scala.collection.JavaConversions.asScalaSet
 import scala.collection.Map
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
-
 import spark.Logging
 import spark.SparkConf
 import spark.SparkException
+import java.JavaUtils;
 private[spark] object Utils extends Logging {
   def byteStringAsGb(str: String): Long = {
     JavaUtils.byteStringAsGb(str)

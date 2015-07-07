@@ -1,4 +1,4 @@
-package spark.util;
+package java;
 
 public enum ByteUnit {
     BYTE (1),

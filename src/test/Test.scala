@@ -1,5 +1,5 @@
 
-package spark
+package test
 
 import scala.math.random
 object Test {

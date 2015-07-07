@@ -1,11 +1,11 @@
-package spark.examples
+package test
 
 import scala.math.random
 import spark._
 import SparkContext._
 
 object SparkPi {
-  def main(args: Array[String]) {
+ def main(args:Array[String]) {
     if (args.length == 0) {
       System.err.println("Usage: SparkPi <master> [<slices>]")
       System.exit(1)

@@ -10,7 +10,6 @@
 	<classpathentry kind="lib" path="lib/log4j-1.2.16.jar"/>
 	<classpathentry kind="lib" path="lib/akka-actor_2.11-2.3.11.jar"/>
 	<classpathentry kind="lib" path="lib/akka-remote_2.11-2.3.11.jar"/>
-	<classpathentry kind="lib" path="lib/asm-5.0.4.jar"/>
-	<classpathentry kind="lib" path="lib/asm-commons.jar"/>
+	<classpathentry kind="lib" path="lib/asm-all-3.3.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
