@@ -1,18 +1,101 @@
-package spark
+package spark.util
 
 import java.io._
-import java.net.{InetAddress, URL, URI}
-import java.util.{Locale, Random, UUID}
-import java.util.concurrent.{Executors, ThreadFactory, ThreadPoolExecutor}
-//import org.apache.hadoop.conf.Configuration
-//import org.apache.hadoop.fs.{Path, FileSystem, FileUtil}
+import java.io._
+import java.net._
+import java.net.InetAddress
+import java.net.URI
+import java.net.URL
+import java.util.Locale
+import java.util.Properties
+import java.util.Random
+import java.util.UUID
+import java.util.concurrent._
+import java.util.concurrent.Executors
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.ThreadPoolExecutor
+import scala.collection.JavaConversions._
+import scala.collection.Map
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
+import scala.reflect.ClassTag
+import scala.util.control.ControlThrowable
+import spark.SparkConf
+import spark.Logging
+import spark.SparkException
+private[spark] object Utils extends Logging {
 
-/**
- * Various utility methods used by Spark.
- */
-private object Utils extends Logging {
+  def startServiceOnPort[T](
+    startPort: Int,
+    startService: Int => (T, Int),
+    conf: SparkConf,
+    serviceName: String = ""): (T, Int) = {
+
+    require(startPort == 0 || (1024 <= startPort && startPort < 65536),
+      "startPort should be between 1024 and 65535 (inclusive), or 0 for a random free port.")
+
+    val serviceString = if (serviceName.isEmpty) "" else s" '$serviceName'"
+    val maxRetries = portMaxRetries(conf)
+    for (offset <- 0 to maxRetries) {
+      // Do not increment port if startPort is 0, which is treated as a special port
+      val tryPort = if (startPort == 0) {
+        startPort
+      } else {
+        // If the new port wraps around, do not try a privilege port
+        ((startPort + offset - 1024) % (65536 - 1024)) + 1024
+      }
+      try {
+        val (service, port) = startService(tryPort)
+        logInfo(s"Successfully started service$serviceString on port $port.")
+        return (service, port)
+      } catch {
+        case e: Exception if isBindCollision(e) =>
+          if (offset >= maxRetries) {
+            val exceptionMessage =
+              s"${e.getMessage}: Service$serviceString failed after $maxRetries retries!"
+            val exception = new BindException(exceptionMessage)
+            // restore original stack trace
+            exception.setStackTrace(e.getStackTrace)
+            throw exception
+          }
+          logWarning(s"Service$serviceString could not bind on port $tryPort. " +
+            s"Attempting port ${tryPort + 1}.")
+      }
+    }
+    // Should never happen
+    throw new SparkException(s"Failed to start service$serviceString on port $startPort")
+  }
+  
+  def isBindCollision(exception: Throwable): Boolean = {
+    exception match {
+      case e: BindException =>
+        if (e.getMessage != null) {
+          return true
+        }
+        isBindCollision(e.getCause)
+      case e: Exception => isBindCollision(e.getCause)
+      case _ => false
+    }
+  }
+  
+  def portMaxRetries(conf: SparkConf): Int = {
+    val maxRetries = conf.getOption("spark.port.maxRetries").map(_.toInt)
+    if (conf.contains("spark.testing")) {
+      // Set a higher number of retries for tests...
+      maxRetries.getOrElse(100)
+    } else {
+      maxRetries.getOrElse(16)
+    }
+  }
+
+  def timeStringAsSeconds(str: String): Long = {
+    JavaUtils.timeStringAsSec(str)
+  }
+  def getSystemProperties: Map[String, String] = {
+    val sysProps = for (key <- System.getProperties.stringPropertyNames()) yield (key, System.getProperty(key))
+
+    sysProps.toMap
+  }
   /** Serialize an object using Java serialization */
   def serialize[T](o: T): Array[Byte] = {
     val bos = new ByteArrayOutputStream()
@@ -72,7 +155,7 @@ private object Utils extends Logging {
       attempts += 1
       if (attempts > maxAttempts) {
         throw new IOException("Failed to create a temp directory after " + maxAttempts +
-            " attempts!")
+          " attempts!")
       }
       try {
         dir = new File(root, "spark-" + UUID.randomUUID.toString)
@@ -92,9 +175,8 @@ private object Utils extends Logging {
 
   /** Copy all data from an InputStream to an OutputStream */
   def copyStream(in: InputStream,
-                 out: OutputStream,
-                 closeStreams: Boolean = false)
-  {
+    out: OutputStream,
+    closeStreams: Boolean = false) {
     val buf = new Array[Byte](8192)
     var n = 0
     while (n != -1) {
@@ -146,20 +228,20 @@ private object Utils extends Logging {
           // file's absolute path from the url.
           val sourceFile = new File(uri)
           logInfo("Symlinking " + sourceFile.getAbsolutePath + " to " + targetFile.getAbsolutePath)
-        //  FileUtil.symLink(sourceFile.getAbsolutePath, targetFile.getAbsolutePath)
+          //  FileUtil.symLink(sourceFile.getAbsolutePath, targetFile.getAbsolutePath)
         } else {
           // url is not absolute, i.e. itself is the path to the source file.
           logInfo("Symlinking " + url + " to " + targetFile.getAbsolutePath)
-        //  FileUtil.symLink(url, targetFile.getAbsolutePath)
+          //  FileUtil.symLink(url, targetFile.getAbsolutePath)
         }
       case _ =>
-        // Use the Hadoop filesystem library, which supports file://, hdfs://, s3://, and others
-//        val uri = new URI(url)
-//        val conf = new Configuration()
-//        val fs = FileSystem.get(uri, conf)
-//        val in = fs.open(new Path(uri))
-//        val out = new FileOutputStream(targetFile)
-//        Utils.copyStream(in, out, true)
+      // Use the Hadoop filesystem library, which supports file://, hdfs://, s3://, and others
+      //        val uri = new URI(url)
+      //        val conf = new Configuration()
+      //        val fs = FileSystem.get(uri, conf)
+      //        val in = fs.open(new Path(uri))
+      //        val out = new FileOutputStream(targetFile)
+      //        Utils.copyStream(in, out, true)
     }
     // Decompress the file if it's a .tar or .tar.gz
     if (filename.endsWith(".tar.gz") || filename.endsWith(".tgz")) {
@@ -170,7 +252,7 @@ private object Utils extends Logging {
       Utils.execute(Seq("tar", "-xf", filename), targetDir)
     }
     // Make the file executable - That's necessary for scripts
-//    FileUtil.chmod(filename, "a+x")
+    //    FileUtil.chmod(filename, "a+x")
   }
 
   /**
@@ -224,8 +306,8 @@ private object Utils extends Logging {
   private def newDaemonThreadFactory: ThreadFactory = {
     new ThreadFactory {
       def newThread(r: Runnable): Thread = {
-        var t = Executors.defaultThreadFactory.newThread (r)
-        t.setDaemon (true)
+        var t = Executors.defaultThreadFactory.newThread(r)
+        t.setDaemon(true)
         return t
       }
     }
@@ -237,7 +319,7 @@ private object Utils extends Logging {
   def newDaemonCachedThreadPool(): ThreadPoolExecutor = {
     var threadPool = Executors.newCachedThreadPool.asInstanceOf[ThreadPoolExecutor]
 
-    threadPool.setThreadFactory (newDaemonThreadFactory)
+    threadPool.setThreadFactory(newDaemonThreadFactory)
 
     return threadPool
   }
@@ -283,14 +365,14 @@ private object Utils extends Logging {
   def memoryStringToMb(str: String): Int = {
     val lower = str.toLowerCase
     if (lower.endsWith("k")) {
-      (lower.substring(0, lower.length-1).toLong / 1024).toInt
+      (lower.substring(0, lower.length - 1).toLong / 1024).toInt
     } else if (lower.endsWith("m")) {
-      lower.substring(0, lower.length-1).toInt
+      lower.substring(0, lower.length - 1).toInt
     } else if (lower.endsWith("g")) {
-      lower.substring(0, lower.length-1).toInt * 1024
+      lower.substring(0, lower.length - 1).toInt * 1024
     } else if (lower.endsWith("t")) {
-      lower.substring(0, lower.length-1).toInt * 1024 * 1024
-    } else {// no suffix, so it's just a number in bytes
+      lower.substring(0, lower.length - 1).toInt * 1024 * 1024
+    } else { // no suffix, so it's just a number in bytes
       (lower.toLong / 1024 / 1024).toInt
     }
   }
@@ -305,13 +387,13 @@ private object Utils extends Logging {
     val KB = 1L << 10
 
     val (value, unit) = {
-      if (size >= 2*TB) {
+      if (size >= 2 * TB) {
         (size.asInstanceOf[Double] / TB, "TB")
-      } else if (size >= 2*GB) {
+      } else if (size >= 2 * GB) {
         (size.asInstanceOf[Double] / GB, "GB")
-      } else if (size >= 2*MB) {
+      } else if (size >= 2 * MB) {
         (size.asInstanceOf[Double] / MB, "MB")
-      } else if (size >= 2*KB) {
+      } else if (size >= 2 * KB) {
         (size.asInstanceOf[Double] / KB, "KB")
       } else {
         (size.asInstanceOf[Double], "B")
@@ -333,9 +415,9 @@ private object Utils extends Logging {
    */
   def execute(command: Seq[String], workingDir: File) {
     val process = new ProcessBuilder(command: _*)
-        .directory(workingDir)
-        .redirectErrorStream(true)
-        .start()
+      .directory(workingDir)
+      .redirectErrorStream(true)
+      .start()
     new Thread("read stdout for " + command(0)) {
       override def run() {
         for (line <- Source.fromInputStream(process.getInputStream).getLines) {
@@ -357,14 +439,13 @@ private object Utils extends Logging {
     execute(command, new File("."))
   }
 
-
   /**
    * When called inside a class in the spark package, returns the name of the user code class
    * (outside the spark package) that called into Spark, as well as which Spark method they called.
    * This is used, for example, to tell users where in their code each RDD got created.
    */
   def getSparkCallSite: String = {
-    val trace = Thread.currentThread.getStackTrace().filter( el =>
+    val trace = Thread.currentThread.getStackTrace().filter(el =>
       (!el.getMethodName.contains("getStackTrace")))
 
     // Keep crawling up the stack trace until we find the first function not inside of the spark
@@ -385,8 +466,7 @@ private object Utils extends Logging {
           } else {
             el.getMethodName
           }
-        }
-        else {
+        } else {
           firstUserLine = el.getLineNumber
           firstUserFile = el.getFileName
           finished = true

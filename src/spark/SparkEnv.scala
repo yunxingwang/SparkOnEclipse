@@ -18,7 +18,7 @@ import spark.JavaSerializer
  * objects needs to have the right SparkEnv set. You can get the current environment with
  * SparkEnv.get (e.g. after creating a SparkContext) and set it with SparkEnv.set.
  */
-class SparkEnv (
+class SparkEnv(
     val actorSystem: ActorSystem,
     val serializer: Serializer,
     val closureSerializer: Serializer,
@@ -28,8 +28,7 @@ class SparkEnv (
     val broadcastManager: BroadcastManager,
     val blockManager: BlockManager,
     val connectionManager: ConnectionManager,
-    val httpFileServer: HttpFileServer
-  ) {
+    val httpFileServer: HttpFileServer) {
 
   /** No-parameter constructor for unit tests. */
   def this() = {
@@ -53,7 +52,8 @@ class SparkEnv (
 
 object SparkEnv extends Logging {
   private val env = new ThreadLocal[SparkEnv]
-
+  private[spark] val executorActorSystemName = "sparkExecutor"
+  private[spark] val driverActorSystemName = "sparkDriver"
   def set(e: SparkEnv) {
     env.set(e)
   }
@@ -63,11 +63,10 @@ object SparkEnv extends Logging {
   }
 
   def createFromSystemProperties(
-      hostname: String,
-      port: Int,
-      isMaster: Boolean,
-      isLocal: Boolean
-    ) : SparkEnv = {
+    hostname: String,
+    port: Int,
+    isMaster: Boolean,
+    isLocal: Boolean): SparkEnv = {
 
     val (actorSystem, boundPort) = AkkaUtils.createActorSystem("spark", hostname, port)
 
@@ -87,10 +86,10 @@ object SparkEnv extends Logging {
     }
 
     val serializer = instantiateClass[Serializer]("spark.serializer", "spark.JavaSerializer")
-    
+
     val blockManagerMaster = new BlockManagerMaster(actorSystem, isMaster, isLocal)
     val blockManager = new BlockManager(blockManagerMaster, serializer)
-    
+
     val connectionManager = blockManager.connectionManager
 
     val broadcastManager = new BroadcastManager(isMaster)
@@ -105,7 +104,7 @@ object SparkEnv extends Logging {
 
     val shuffleFetcher = instantiateClass[ShuffleFetcher](
       "spark.shuffle.fetcher", "spark.BlockStoreShuffleFetcher")
-    
+
     val httpFileServer = new HttpFileServer()
     httpFileServer.initialize()
     System.setProperty("spark.fileserver.uri", httpFileServer.serverUri)
