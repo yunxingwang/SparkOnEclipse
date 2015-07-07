@@ -1,4 +1,4 @@
-package java;
+package javaclass;
 
 public enum ByteUnit {
     BYTE (1),

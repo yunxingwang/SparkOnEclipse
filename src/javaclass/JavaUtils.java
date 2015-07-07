@@ -1,4 +1,4 @@
-package java;
+package javaclass;
 
 import java.io.Closeable;
 import java.io.File;
