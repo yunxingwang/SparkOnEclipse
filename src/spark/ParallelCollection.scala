@@ -40,9 +40,9 @@ private[spark] class ParallelCollection[T: ClassTag](
 
   override def compute(s: Split) = s.asInstanceOf[ParallelCollectionSplit[T]].iterator
   
-  override def preferredLocations(s: Split): Seq[String] = Nil
+   def preferredLocations(s: Split): Seq[String] = Nil
   
-  override val dependencies: List[Dependency[_]] = Nil
+   val dependencies: List[Dependency[_]] = Nil
 }
 
 private object ParallelCollection {
