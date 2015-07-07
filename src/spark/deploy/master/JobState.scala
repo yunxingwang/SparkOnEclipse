@@ -3,7 +3,7 @@ package spark.deploy.master
 private[deploy] object JobState extends Enumeration {
 
   type DriverState = Value
-
+  val MAX_NUM_RETRY = 10
   // SUBMITTED: Submitted but not yet scheduled on a worker
   // RUNNING: Has been allocated to a worker to run
   // FINISHED: Previously ran and exited cleanly

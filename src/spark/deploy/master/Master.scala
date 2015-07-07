@@ -7,14 +7,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
-
+import akka.remote.{DisassociatedEvent, RemotingLifecycleEvent}
 import spark.deploy._
 import spark.{Logging, SparkException}
 import spark.util.Utils
 import spark.util.AkkaUtils
+import spark.SparkConf
 
-
-private[spark] class Master(ip: String, port: Int, webUiPort: Int) extends Actor with Logging {
+private[spark] class Master(ip: String, port: Int,  val conf: SparkConf) extends Actor with Logging {
   val DATE_FORMAT = new SimpleDateFormat("yyyyMMddHHmmss")  // For job IDs
 
   var nextJobNumber = 0
@@ -34,21 +34,20 @@ private[spark] class Master(ip: String, port: Int, webUiPort: Int) extends Actor
   override def preStart() {
     logInfo("Starting Spark master at spark://" + ip + ":" + port)
     // Listen for remote client disconnection events, since they don't go through Akka's watch()
-    context.system.eventStream.subscribe(self, classOf[RemoteClientLifeCycleEvent])
+    context.system.eventStream.subscribe(self, classOf[RemotingLifecycleEvent])
   }
 
  
 
   override def receive = {
-    case RegisterWorker(id, host, workerPort, cores, memory, worker_webUiPort) => {
+    case RegisterWorker(id, host, workerPort, cores, memory) => {
       logInfo("Registering worker %s:%d with %d cores, %s RAM".format(
         host, workerPort, cores, Utils.memoryMegabytesToString(memory)))
       if (idToWorker.contains(id)) {
         sender ! RegisterWorkerFailed("Duplicate worker ID")
       } else {
-        addWorker(id, host, workerPort, cores, memory, worker_webUiPort)
+        addWorker(id, host, workerPort, cores, memory)
         context.watch(sender)  // This doesn't work with remote actors but helps for testing
-        sender ! RegisteredWorker("http://" + ip + ":" + webUiPort)
         schedule()
       }
     }
@@ -99,19 +98,6 @@ private[spark] class Master(ip: String, port: Int, webUiPort: Int) extends Actor
       actorToWorker.get(actor).foreach(removeWorker)
       actorToJob.get(actor).foreach(removeJob)
     }
-
-    case RemoteClientDisconnected(transport, address) => {
-      // The disconnected client could've been either a worker or a job; remove whichever it was
-      addressToWorker.get(address).foreach(removeWorker)
-      addressToJob.get(address).foreach(removeJob)
-    }
-
-    case RemoteClientShutdown(transport, address) => {
-      // The disconnected client could've been either a worker or a job; remove whichever it was
-      addressToWorker.get(address).foreach(removeWorker)
-      addressToJob.get(address).foreach(removeJob)
-    }
-
     case RequestMasterState => {
       sender ! MasterState(ip + ":" + port, workers.toList, jobs.toList, completedJobs.toList)
     }
@@ -147,8 +133,8 @@ private[spark] class Master(ip: String, port: Int, webUiPort: Int) extends Actor
     exec.job.actor ! ExecutorAdded(exec.id, worker.id, worker.host, exec.cores, exec.memory)
   }
 
-  def addWorker(id: String, host: String, port: Int, cores: Int, memory: Int, webUiPort: Int): WorkerInfo = {
-    val worker = new WorkerInfo(id, host, port, cores, memory, sender, webUiPort)
+  def addWorker(id: String, host: String, port: Int, cores: Int, memory: Int): WorkerInfo = {
+    val worker = new WorkerInfo(id, host, port, cores, memory, sender)
     workers += worker
     idToWorker(worker.id) = worker
     actorToWorker(sender) = worker
@@ -205,9 +191,10 @@ private[spark] class Master(ip: String, port: Int, webUiPort: Int) extends Actor
 private[spark] object Master {
   def main(argStrings: Array[String]) {
     val args = new MasterArguments(argStrings)
-    val (actorSystem, boundPort) = AkkaUtils.createActorSystem("spark", args.ip, args.port)
+    val conf = new SparkConf
+    val (actorSystem, boundPort) = AkkaUtils.createActorSystem("spark", args.ip, args.port, conf)
     val actor = actorSystem.actorOf(
-      Props(new Master(args.ip, boundPort, args.webUiPort)), name = "Master")
+      Props(new Master(args.ip, boundPort, conf)), name = "Master")
     actorSystem.awaitTermination()
   }
 }

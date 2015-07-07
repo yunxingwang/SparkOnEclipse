@@ -4,12 +4,7 @@ import akka.actor.ActorSystem
 import akka.actor.ActorSystemImpl
 import akka.remote.RemoteActorRefProvider
 import serializer.Serializer
-import spark.broadcast.BroadcastManager
-import spark.storage.BlockManager
-import spark.storage.BlockManagerMaster
-import spark.network.ConnectionManager
 import spark.util.AkkaUtils
-import spark.JavaSerializer
 
 /**
  * 0.6°æ±¾
@@ -22,28 +17,15 @@ import spark.JavaSerializer
 class SparkEnv(
     val actorSystem: ActorSystem,
     val serializer: Serializer,
-    val closureSerializer: Serializer,
-    val cacheTracker: CacheTracker,
-    val mapOutputTracker: MapOutputTracker,
-    val shuffleFetcher: ShuffleFetcher,
-    val broadcastManager: BroadcastManager,
-    val blockManager: BlockManager,
-    val connectionManager: ConnectionManager,
-    val httpFileServer: HttpFileServer) {
+    val closureSerializer: Serializer
+    ) {
 
   /** No-parameter constructor for unit tests. */
   def this() = {
-    this(null, new JavaSerializer, new JavaSerializer, null, null, null, null, null, null, null)
+    this(null, new JavaSerializer, new JavaSerializer)
   }
 
   def stop() {
-    httpFileServer.stop()
-    mapOutputTracker.stop()
-    cacheTracker.stop()
-    shuffleFetcher.stop()
-    broadcastManager.stop()
-    blockManager.stop()
-    blockManager.master.stop()
     actorSystem.shutdown()
     // Unfortunately Akka's awaitTermination doesn't actually wait for the Netty server to shut
     // down, but let's call it anyway in case it gets fixed in a later release
@@ -68,8 +50,8 @@ object SparkEnv extends Logging {
     port: Int,
     isMaster: Boolean,
     isLocal: Boolean): SparkEnv = {
-
-    val (actorSystem, boundPort) = AkkaUtils.createActorSystem("spark", hostname, port)
+    val conf = new SparkConf
+    val (actorSystem, boundPort) = AkkaUtils.createActorSystem("spark", hostname, port,conf)
 
     // Bit of a hack: If this is the master and our port was 0 (meaning bind to any free port),
     // figure out which port number Akka actually bound to and set spark.master.port to it.
@@ -88,27 +70,12 @@ object SparkEnv extends Logging {
 
     val serializer = instantiateClass[Serializer]("spark.serializer", "spark.JavaSerializer")
 
-    val blockManagerMaster = new BlockManagerMaster(actorSystem, isMaster, isLocal)
-    val blockManager = new BlockManager(blockManagerMaster, serializer)
 
-    val connectionManager = blockManager.connectionManager
 
-    val broadcastManager = new BroadcastManager(isMaster)
 
     val closureSerializer = instantiateClass[Serializer](
       "spark.closure.serializer", "spark.JavaSerializer")
 
-    val cacheTracker = new CacheTracker(actorSystem, isMaster, blockManager)
-    blockManager.cacheTracker = cacheTracker
-
-    val mapOutputTracker = new MapOutputTracker(actorSystem, isMaster)
-
-    val shuffleFetcher = instantiateClass[ShuffleFetcher](
-      "spark.shuffle.fetcher", "spark.BlockStoreShuffleFetcher")
-
-    val httpFileServer = new HttpFileServer()
-    httpFileServer.initialize()
-    System.setProperty("spark.fileserver.uri", httpFileServer.serverUri)
 
     // Warn about deprecated spark.cache.class property
     if (System.getProperty("spark.cache.class") != null) {
@@ -119,13 +86,6 @@ object SparkEnv extends Logging {
     new SparkEnv(
       actorSystem,
       serializer,
-      closureSerializer,
-      cacheTracker,
-      mapOutputTracker,
-      shuffleFetcher,
-      broadcastManager,
-      blockManager,
-      connectionManager,
-      httpFileServer)
+      closureSerializer)
   }
 }

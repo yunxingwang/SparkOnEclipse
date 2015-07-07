@@ -12,11 +12,11 @@ import akka.actor._
 import akka.remote.{DisassociatedEvent, RemotingLifecycleEvent}
 import akka.actor.Terminated
 import java.io.File
-
+import akka.remote.{DisassociatedEvent, RemotingLifecycleEvent}
+import spark.SparkConf
 private[spark] class Worker(
     ip: String,
     port: Int,
-    webUiPort: Int,
     cores: Int,
     memory: Int,
     masterUrl: String,
@@ -75,8 +75,8 @@ private[spark] class Worker(
         val akkaUrl = "akka://spark@%s:%s/user/Master".format(masterHost, masterPort)
         try {
           master = context.actorFor(akkaUrl)
-          master ! RegisterWorker(workerId, ip, port, cores, memory, webUiPort)
-          context.system.eventStream.subscribe(self, classOf[RemoteClientLifeCycleEvent])
+          master ! RegisterWorker(workerId, ip, port, cores, memory)
+          context.system.eventStream.subscribe(self, classOf[RemotingLifecycleEvent])
           context.watch(master) // Doesn't work with remote actors, but useful for testing
         } catch {
           case e: Exception =>
@@ -130,9 +130,6 @@ private[spark] class Worker(
       logInfo("Asked to kill executor " + fullId)
       executor.kill()
 
-    case Terminated(_) | RemoteClientDisconnected(_, _) | RemoteClientShutdown(_, _) =>
-      masterDisconnected()
-      
     case RequestWorkerState => {
       sender ! WorkerState(ip + ":" + port, workerId, executors.values.toList, 
         finishedExecutors.values.toList, masterUrl, cores, memory, 
@@ -160,9 +157,10 @@ private[spark] class Worker(
 private[spark] object Worker {
   def main(argStrings: Array[String]) {
     val args = new WorkerArguments(argStrings)
-    val (actorSystem, boundPort) = AkkaUtils.createActorSystem("spark", args.ip, args.port)
+    val conf =new SparkConf 
+    val (actorSystem, boundPort) = AkkaUtils.createActorSystem("spark", args.ip, args.port,conf)
     val actor = actorSystem.actorOf(
-      Props(new Worker(args.ip, boundPort, args.webUiPort, args.cores, args.memory,
+      Props(new Worker(args.ip, boundPort, args.cores, args.memory,
         args.master, args.workDir)),
       name = "Worker")
     actorSystem.awaitTermination()

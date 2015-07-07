@@ -9,8 +9,7 @@ private[spark] class WorkerInfo(
   val port: Int,
   val cores: Int,
   val memory: Int,
-  val actor: ActorRef,
-  val webUiPort: Int) {
+  val actor: ActorRef) {
 
   var executors = new mutable.HashMap[String, ExecutorInfo]  // fullId => info
 
@@ -34,7 +33,4 @@ private[spark] class WorkerInfo(
     }
   }
   
-  def webUiAddress : String = {
-    "http://" + this.host + ":" + this.webUiPort
-  }
 }

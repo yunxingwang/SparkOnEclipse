@@ -28,10 +28,9 @@ private[spark] object AkkaUtils extends Logging {
       name: String,
       host: String,
       port: Int,
-      conf: SparkConf,
-      securityManager: SecurityManager): (ActorSystem, Int) = {
+      conf: SparkConf): (ActorSystem, Int) = {
     val startService: Int => (ActorSystem, Int) = { actualPort =>
-      doCreateActorSystem(name, host, actualPort, conf, securityManager)
+      doCreateActorSystem(name, host, actualPort, conf)
     }
     Utils.startServiceOnPort(port, startService, conf, name)
   }
@@ -40,8 +39,7 @@ private[spark] object AkkaUtils extends Logging {
       name: String,
       host: String,
       port: Int,
-      conf: SparkConf,
-      securityManager: SecurityManager): (ActorSystem, Int) = {
+      conf: SparkConf): (ActorSystem, Int) = {
 
     val akkaThreads = conf.getInt("spark.akka.threads", 4)
     val akkaBatchSize = conf.getInt("spark.akka.batchSize", 15)
