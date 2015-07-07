@@ -2,17 +2,14 @@ package spark.deploy.worker
 
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 import akka.actor.{ActorRef, Props, Actor}
-import spark.{Logging, Utils}
+import spark.Logging
 import spark.util.AkkaUtils
 import spark.deploy._
-import akka.remote.RemoteClientLifeCycleEvent
+import spark.util.Utils
 import java.text.SimpleDateFormat
 import java.util.Date
-import akka.remote.RemoteClientShutdown
-import akka.remote.RemoteClientDisconnected
-import spark.deploy.RegisterWorker
-import spark.deploy.LaunchExecutor
-import spark.deploy.RegisterWorkerFailed
+import akka.actor._
+import akka.remote.{DisassociatedEvent, RemotingLifecycleEvent}
 import akka.actor.Terminated
 import java.io.File
 
@@ -69,7 +66,6 @@ private[spark] class Worker(
     logInfo("Spark home: " + sparkHome)
     createWorkDir()
     connectToMaster()
-    startWebUi()
   }
 
   def connectToMaster() {
@@ -95,16 +91,7 @@ private[spark] class Worker(
     }
   }
 
-  def startWebUi() {
-    val webUi = new WorkerWebUI(context.system, self)
-    try {
-      AkkaUtils.startSprayServer(context.system, "0.0.0.0", webUiPort, webUi.handler)
-    } catch {
-      case e: Exception =>
-        logError("Failed to create web UI", e)
-        System.exit(1)
-    }
-  }
+  
 
   override def receive = {
     case RegisteredWorker(url) =>

@@ -5,7 +5,8 @@ import akka.actor.{ActorRef, Props, Actor, ActorSystem, Terminated}
 import spark.deploy.worker.Worker
 import spark.deploy.master.Master
 import spark.util.AkkaUtils
-import spark.{Logging, Utils}
+import spark.Logging
+import spark.util.Utils
 
 import scala.collection.mutable.ArrayBuffer
 

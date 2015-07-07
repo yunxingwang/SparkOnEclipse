@@ -12,6 +12,7 @@ import spark.util.AkkaUtils
 import spark.JavaSerializer
 
 /**
+ * 0.6°æ±¾
  * Holds all the runtime environment objects for a running Spark instance (either master or worker),
  * including the serializer, Akka actor system, block manager, map output tracker, etc. Currently
  * Spark code finds the SparkEnv through a thread-local variable, so each thread that accesses these

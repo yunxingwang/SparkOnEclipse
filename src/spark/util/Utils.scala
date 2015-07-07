@@ -1,29 +1,75 @@
 package spark.util
 
-import java.io._
-import java.io._
-import java.net._
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.io.IOException
+import java.io.InputStream
+import java.io.ObjectInputStream
+import java.io.ObjectOutputStream
+import java.io.ObjectStreamClass
+import java.io.OutputStream
+import java.net.BindException
 import java.net.InetAddress
 import java.net.URI
 import java.net.URL
 import java.util.Locale
-import java.util.Properties
 import java.util.Random
 import java.util.UUID
-import java.util.concurrent._
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
-import scala.collection.JavaConversions._
+
+import scala.collection.JavaConversions.asScalaSet
 import scala.collection.Map
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
-import scala.reflect.ClassTag
-import scala.util.control.ControlThrowable
-import spark.SparkConf
+
 import spark.Logging
+import spark.SparkConf
 import spark.SparkException
 private[spark] object Utils extends Logging {
+  def byteStringAsGb(str: String): Long = {
+    JavaUtils.byteStringAsGb(str)
+  }
+  def byteStringAsBytes(str: String): Long = {
+    JavaUtils.byteStringAsBytes(str)
+  }
+  def byteStringAsKb(str: String): Long = {
+    JavaUtils.byteStringAsKb(str)
+  }
+  def byteStringAsMb(str: String): Long = {
+    JavaUtils.byteStringAsMb(str)
+  }
+  def timeStringAsMs(str: String): Long = {
+    JavaUtils.timeStringAsMs(str)
+  }
+  def extractHostPortFromSparkUrl(sparkUrl: String): (String, Int) = {
+    try {
+      val uri = new java.net.URI(sparkUrl)
+      val host = uri.getHost
+      val port = uri.getPort
+      if (uri.getScheme != "spark" ||
+        host == null ||
+        port < 0 ||
+        (uri.getPath != null && !uri.getPath.isEmpty) || // uri.getPath returns "" instead of null
+        uri.getFragment != null ||
+        uri.getQuery != null ||
+        uri.getUserInfo != null) {
+        throw new SparkException("Invalid master URL: " + sparkUrl)
+      }
+      (host, port)
+    } catch {
+      case e: java.net.URISyntaxException =>
+        throw new SparkException("Invalid master URL: " + sparkUrl, e)
+    }
+  }
+  def getSparkClassLoader: ClassLoader = getClass.getClassLoader
+
+  def getContextOrSparkClassLoader: ClassLoader =
+    Option(Thread.currentThread().getContextClassLoader).getOrElse(getSparkClassLoader)
 
   def startServiceOnPort[T](
     startPort: Int,
@@ -65,7 +111,7 @@ private[spark] object Utils extends Logging {
     // Should never happen
     throw new SparkException(s"Failed to start service$serviceString on port $startPort")
   }
-  
+
   def isBindCollision(exception: Throwable): Boolean = {
     exception match {
       case e: BindException =>
@@ -77,7 +123,7 @@ private[spark] object Utils extends Logging {
       case _ => false
     }
   }
-  
+
   def portMaxRetries(conf: SparkConf): Int = {
     val maxRetries = conf.getOption("spark.port.maxRetries").map(_.toInt)
     if (conf.contains("spark.testing")) {

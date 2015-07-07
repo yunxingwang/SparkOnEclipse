@@ -6,8 +6,8 @@ import spark.scheduler.local.LocalScheduler
 import scala.reflect.ClassTag
 import spark.scheduler.TaskScheduler
 /**
- * 先不接触文件中的数据，计算pi或者从内存生成数据
- * @author guotong
+ * 先不接触文件中的数据，计算pi或者从内存生成数据</br>
+ * 还是以0.6版本为主，1.4版本只是要里面的util
  */
 class SparkContext(master: String, frameworkName: String) {
   private var nextRddId = new AtomicInteger(0)

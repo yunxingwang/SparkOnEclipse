@@ -5,7 +5,7 @@ import java.net.URLClassLoader
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.mutable.HashMap
-
+import spark.util.Utils
 import spark._
 import executor.ExecutorURLClassLoader
 import spark.scheduler._
