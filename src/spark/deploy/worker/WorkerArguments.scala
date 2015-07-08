@@ -10,12 +10,12 @@ import java.lang.management.ManagementFactory
  */
 private[spark] class WorkerArguments(args: Array[String]) {
   var ip = Utils.localIpAddress()
-  var port = 0
+  var port = 7078
   var webUiPort = 8081
   var cores = inferDefaultCores()
   var memory = inferDefaultMemory()
-  var master: String = null
-  var workDir: String = null
+  var master: String = "spark://127.0.0.1:7077"
+  var workDir: String = "D:/spark"
   
   // Check for settings in environment variables 
   if (System.getenv("SPARK_WORKER_PORT") != null) {

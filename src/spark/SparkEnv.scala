@@ -7,7 +7,6 @@ import serializer.Serializer
 import spark.util.AkkaUtils
 
 /**
- * 0.6°æ±¾
  * Holds all the runtime environment objects for a running Spark instance (either master or worker),
  * including the serializer, Akka actor system, block manager, map output tracker, etc. Currently
  * Spark code finds the SparkEnv through a thread-local variable, so each thread that accesses these
@@ -17,12 +16,12 @@ import spark.util.AkkaUtils
 class SparkEnv(
     val actorSystem: ActorSystem,
     val serializer: Serializer,
-    val closureSerializer: Serializer
-    ) {
+    val closureSerializer: Serializer,
+    val mapOutputTracker: MapOutputTracker) {
 
   /** No-parameter constructor for unit tests. */
   def this() = {
-    this(null, new JavaSerializer, new JavaSerializer)
+    this(null, new JavaSerializer, new JavaSerializer, null)
   }
 
   def stop() {
@@ -51,7 +50,7 @@ object SparkEnv extends Logging {
     isMaster: Boolean,
     isLocal: Boolean): SparkEnv = {
     val conf = new SparkConf
-    val (actorSystem, boundPort) = AkkaUtils.createActorSystem("spark", hostname, port,conf)
+    val (actorSystem, boundPort) = AkkaUtils.createActorSystem("spark", hostname, port, conf)
 
     // Bit of a hack: If this is the master and our port was 0 (meaning bind to any free port),
     // figure out which port number Akka actually bound to and set spark.master.port to it.
@@ -70,22 +69,19 @@ object SparkEnv extends Logging {
 
     val serializer = instantiateClass[Serializer]("spark.serializer", "spark.JavaSerializer")
 
-
-
-
     val closureSerializer = instantiateClass[Serializer](
       "spark.closure.serializer", "spark.JavaSerializer")
-
 
     // Warn about deprecated spark.cache.class property
     if (System.getProperty("spark.cache.class") != null) {
       logWarning("The spark.cache.class property is no longer being used! Specify storage " +
         "levels using the RDD.persist() method instead.")
     }
+    val mapOutputTracker = new MapOutputTracker(actorSystem, isMaster)
 
     new SparkEnv(
       actorSystem,
       serializer,
-      closureSerializer)
+      closureSerializer, mapOutputTracker)
   }
 }

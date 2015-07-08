@@ -1,7 +1,8 @@
 package spark
-import scala.reflect.ClassTag
-import spark.storage.StorageLevel
+
 import scala.collection.mutable.ArrayBuffer
+import scala.reflect.ClassTag
+import spark.rdd.SampledRDD
 import spark.util.Utils
 /**
  * @author guotong
@@ -12,6 +13,7 @@ abstract class RDD[T: ClassTag](@transient sc: SparkContext) extends Serializabl
   private[spark] val origin = Utils.getSparkCallSite
   def map[U: ClassTag](f: T => U): RDD[U] = new MappedRDD(this, sc.clean(f))
   def splits: Array[Split]
+   @transient val dependencies: List[Dependency[_]]
   final def iterator(split: Split): Iterator[T] = {
     compute(split)
   }
@@ -36,4 +38,30 @@ abstract class RDD[T: ClassTag](@transient sc: SparkContext) extends Serializabl
       return results.reduceLeft(cleanF)
     }
   }
+
+  /**
+   * Return the number of elements in the RDD.
+   */
+  def count(): Long = {
+    sc.runJob(this, (iter: Iterator[T]) => {
+      var result = 0L
+      while (iter.hasNext) {
+        result += 1L
+        iter.next
+      }
+      result
+    }).sum
+  }
+
+  /**
+   * Return a sampled subset of this RDD.
+   */
+  def sample(withReplacement: Boolean, fraction: Double, seed: Int): RDD[T] =
+    new SampledRDD(this, withReplacement, fraction, seed)
+
+  def collect(): Array[T] = {
+    val results = sc.runJob(this, (iter: Iterator[T]) => iter.toArray)
+    Array.concat(results: _*)
+  }
+  def preferredLocations(split: Split): Seq[String] = Nil
 }

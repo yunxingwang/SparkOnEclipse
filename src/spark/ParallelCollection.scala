@@ -33,14 +33,14 @@ private[spark] class ParallelCollection[T: ClassTag](
   @transient
   val splits_ = {
     val slices = ParallelCollection.slice(data, numSlices).toArray
-    slices.indices.map(i => new ParallelCollectionSplit(id, i, slices(i))).toArray//id是父类的成员
+    slices.indices.map(i => new ParallelCollectionSplit(id, i, slices(i))).toArray
   }
 
   override def splits = splits_.asInstanceOf[Array[Split]]
 
   override def compute(s: Split) = s.asInstanceOf[ParallelCollectionSplit[T]].iterator
   
-   def preferredLocations(s: Split): Seq[String] = Nil
+   override def preferredLocations(s: Split): Seq[String] = Nil
   
    val dependencies: List[Dependency[_]] = Nil
 }
