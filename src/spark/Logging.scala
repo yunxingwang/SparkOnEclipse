@@ -13,7 +13,6 @@ trait Logging {
   // be serialized and used on another machine
   @transient
   private var log_ : Logger = null
-
   // Method to get or create the logger for this object
   protected def log: Logger = {
     if (log_ == null) {

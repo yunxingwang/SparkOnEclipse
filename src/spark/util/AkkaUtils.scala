@@ -29,10 +29,20 @@ private[spark] object AkkaUtils extends Logging {
       host: String,
       port: Int,
       conf: SparkConf): (ActorSystem, Int) = {
-    val startService: Int => (ActorSystem, Int) = { actualPort =>
-      doCreateActorSystem(name, host, actualPort, conf)
-    }
-    Utils.startServiceOnPort(port, startService, conf, name)
+//    val startService: Int => (ActorSystem, Int) = { actualPort =>
+//      doCreateActorSystem(name, host, actualPort, conf)//actualPort对应Int，doCreateActorSystem对应 (ActorSystem, Int) 
+//    }
+//    Utils.startServiceOnPort(port, startService, conf, name)//传一个函数进去的
+    
+    val akkaThreads = System.getProperty("spark.akka.threads", "4").toInt
+    val akkaBatchSize = System.getProperty("spark.akka.batchSize", "15").toInt
+    val akkaConf = ConfigFactory.parseString("""
+      akka.remote.netty.hostname = "%s"
+      akka.remote.netty.port = %d
+      """.format(host, port))
+
+    val actorSystem = ActorSystem("spark",akkaConf)
+    (actorSystem, port)
   }
 
   private def doCreateActorSystem(
@@ -84,7 +94,7 @@ private[spark] object AkkaUtils extends Logging {
       |akka.log-dead-letters-during-shutdown = $lifecycleEvents
       """.stripMargin))
 
-    val actorSystem = ActorSystem(name, akkaConf)
+    val actorSystem = ActorSystem(name)
     val provider = actorSystem.asInstanceOf[ExtendedActorSystem].provider
     val boundPort = provider.getDefaultAddress.port.get
     (actorSystem, boundPort)

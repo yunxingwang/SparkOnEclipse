@@ -64,6 +64,7 @@ class DAGScheduler(taskSched: TaskScheduler) extends TaskSchedulerListener with 
   var cacheLocs = new HashMap[Int, Array[List[String]]]
 
   val env = SparkEnv.get
+  val cacheTracker = env.cacheTracker
   val mapOutputTracker = env.mapOutputTracker
 
   val deadHosts = new HashSet[String]  // TODO: The code currently assumes these can't come back;
@@ -90,6 +91,9 @@ class DAGScheduler(taskSched: TaskScheduler) extends TaskSchedulerListener with 
     cacheLocs(rdd.id)
   }
   
+  def updateCacheLocs() {
+    cacheLocs = cacheTracker.getLocationsSnapshot()
+  }
 
   /**
    * Get or create a shuffle map stage for the given shuffle dependency's map side.
@@ -115,6 +119,7 @@ class DAGScheduler(taskSched: TaskScheduler) extends TaskSchedulerListener with 
     // Kind of ugly: need to register RDDs with the cache and map output tracker here
     // since we can't do it in the RDD constructor because # of splits is unknown
     logInfo("Registering RDD " + rdd.id + " (" + rdd.origin + ")")
+    cacheTracker.registerRDD(rdd.id, rdd.splits.size)
     if (shuffleDep != None) {
       mapOutputTracker.registerShuffle(shuffleDep.get.shuffleId, rdd.splits.size)
     }
@@ -137,6 +142,7 @@ class DAGScheduler(taskSched: TaskScheduler) extends TaskSchedulerListener with 
         // Kind of ugly: need to register RDDs with the cache here since
         // we can't do it in its constructor because # of splits is unknown
         logInfo("Registering parent RDD " + r.id + " (" + r.origin + ")")
+        cacheTracker.registerRDD(r.id, r.splits.size)
         for (dep <- r.dependencies) {
           dep match {
             case shufDep: ShuffleDependency[_,_,_] =>
@@ -202,7 +208,7 @@ class DAGScheduler(taskSched: TaskScheduler) extends TaskSchedulerListener with 
     }
   }
 
- 
+
 
   /**
    * The main event loop of the DAG scheduler, which waits for new-job / task-finished / failure
@@ -224,6 +230,7 @@ class DAGScheduler(taskSched: TaskScheduler) extends TaskSchedulerListener with 
           val runId = nextRunId.getAndIncrement()
           val finalStage = newStage(finalRDD, None, runId)
           val job = new ActiveJob(runId, finalStage, func, partitions, callSite, listener)
+          updateCacheLocs()
           logInfo("Got job " + job.runId + " (" + callSite + ") with " + partitions.length +
                   " output partitions")
           logInfo("Final stage: " + finalStage + " (" + finalStage.origin + ")")
@@ -237,6 +244,7 @@ class DAGScheduler(taskSched: TaskScheduler) extends TaskSchedulerListener with 
             resultStageToJob(finalStage) = job
             submitStage(finalStage)
           }
+
 
 
         case completion: CompletionEvent =>
@@ -264,6 +272,7 @@ class DAGScheduler(taskSched: TaskScheduler) extends TaskSchedulerListener with 
       // on the failed node.
       if (failed.size > 0 && time > lastFetchFailureTime + RESUBMIT_TIMEOUT) {
         logInfo("Resubmitting failed stages")
+        updateCacheLocs()
         val failed2 = failed.toArray
         failed.clear()
         for (stage <- failed2.sortBy(_.priority)) {
@@ -412,6 +421,7 @@ class DAGScheduler(taskSched: TaskScheduler) extends TaskSchedulerListener with 
                   stage.shuffleDep.get.shuffleId,
                   stage.outputLocs.map(list => if (list.isEmpty) null else list.head).toArray)
               }
+              updateCacheLocs()
               if (stage.outputLocs.count(_ == Nil) != 0) {
                 // Some tasks had failed; let's resubmit this stage
                 // TODO: Lower-level scheduler should also deal with this
@@ -469,7 +479,7 @@ class DAGScheduler(taskSched: TaskScheduler) extends TaskSchedulerListener with 
     }
   }
 
-  
+
   
   /**
    * Aborts all jobs depending on a particular Stage. This is called in response to a task set
@@ -549,3 +559,4 @@ class DAGScheduler(taskSched: TaskScheduler) extends TaskSchedulerListener with 
     taskSched.stop()
   }
 }
+

@@ -17,11 +17,12 @@ class SparkEnv(
     val actorSystem: ActorSystem,
     val serializer: Serializer,
     val closureSerializer: Serializer,
+    val cacheTracker: CacheTracker,
     val mapOutputTracker: MapOutputTracker) {
 
   /** No-parameter constructor for unit tests. */
   def this() = {
-    this(null, new JavaSerializer, new JavaSerializer, null)
+    this(null, new JavaSerializer, new JavaSerializer, null, null)
   }
 
   def stop() {
@@ -71,7 +72,7 @@ object SparkEnv extends Logging {
 
     val closureSerializer = instantiateClass[Serializer](
       "spark.closure.serializer", "spark.JavaSerializer")
-
+    val cacheTracker = new CacheTracker(actorSystem, isMaster)
     // Warn about deprecated spark.cache.class property
     if (System.getProperty("spark.cache.class") != null) {
       logWarning("The spark.cache.class property is no longer being used! Specify storage " +
@@ -82,6 +83,6 @@ object SparkEnv extends Logging {
     new SparkEnv(
       actorSystem,
       serializer,
-      closureSerializer, mapOutputTracker)
+      closureSerializer, cacheTracker, mapOutputTracker)
   }
 }

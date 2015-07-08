@@ -21,6 +21,12 @@ class SparkContext(
   def this(master: String, jobName: String, sparkHome: String, jars: Seq[String]) =
     this(master, jobName, sparkHome, jars, Map())
   def this(master: String, jobName: String) = this(master, jobName, null, Nil, Map())
+  if (System.getProperty("spark.master.host") == null) {
+    System.setProperty("spark.master.host", Utils.localIpAddress())
+  }
+  if (System.getProperty("spark.master.port") == null) {
+    System.setProperty("spark.master.port", "7075")
+  }
   private var nextRddId = new AtomicInteger(0)
   private var nextShuffleId = new AtomicInteger(0)
   private[spark] def newShuffleId(): Int = nextShuffleId.getAndIncrement()
@@ -53,7 +59,7 @@ class SparkContext(
     // Regular expression for local[N, maxRetries], used in tests with failing tasks
     val LOCAL_N_FAILURES_REGEX = """local\[([0-9]+)\s*,\s*([0-9]+)\]""".r
     // Regular expression for simulating a Spark cluster of [N, cores, memory] locally
-    val LOCAL_CLUSTER_REGEX = """local-cluster\[\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*]""".r
+    val LOCAL_CLUSTER_REGEX = """local-cluster""".r
     // Regular expression for connecting to Spark deploy clusters
     val SPARK_REGEX = """(spark://.*)""".r
 
@@ -67,7 +73,10 @@ class SparkContext(
       case LOCAL_N_FAILURES_REGEX(threads, maxFailures) =>
         new LocalScheduler(threads.toInt, maxFailures.toInt, this)
 
-      case LOCAL_CLUSTER_REGEX(numSlaves, coresPerSlave, memoryPerSlave) =>
+      case LOCAL_CLUSTER_REGEX() =>
+        val numSlaves = 2
+        val coresPerSlave = 1 
+        val memoryPerSlave = 1024
         // Check to make sure SPARK_MEM <= memoryPerSlave. Otherwise Spark will just hang.
         val memoryPerSlaveInt = memoryPerSlave.toInt
         val sparkMemEnv = System.getenv("SPARK_MEM")
@@ -92,7 +101,7 @@ class SparkContext(
     }
   }
   taskScheduler.start()
-  // private var dagScheduler = new DAGScheduler(taskScheduler)
+  private var dagScheduler = new DAGScheduler(taskScheduler)
   private[spark] def clean[F <: AnyRef](f: F): F = {
     ClosureCleaner.clean(f)
     return f
@@ -107,8 +116,8 @@ class SparkContext(
     partitions: Seq[Int],
     allowLocal: Boolean): Array[U] = {
     val callSite = Utils.getSparkCallSite
-    // val result = dagScheduler.runJob(rdd, func, partitions, callSite, allowLocal)
-    null
+    val result = dagScheduler.runJob(rdd, func, partitions, callSite, allowLocal)
+    result
   }
   def runJob[T, U: ClassTag](
     rdd: RDD[T],
