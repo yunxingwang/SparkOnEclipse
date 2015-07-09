@@ -26,7 +26,7 @@ private[spark] class Worker(
   val DATE_FORMAT = new SimpleDateFormat("yyyyMMddHHmmss")  // For worker and executor IDs
   val MASTER_REGEX = "spark://([^:]+):([0-9]+)".r
 
-  var master: ActorRef = null
+  var master: ActorSelection = null
   var masterWebUiUrl : String = ""
   val workerId = generateWorkerId()
   var sparkHome: File = null
@@ -72,12 +72,12 @@ private[spark] class Worker(
     masterUrl match {
       case MASTER_REGEX(masterHost, masterPort) => {
         logInfo("Connecting to master spark://" + masterHost + ":" + masterPort)
-        val akkaUrl = "akka://spark@%s:%s/user/Master".format(masterHost, masterPort)
+        val akkaUrl = "akka.tcp://spark@%s:%s/user/Master".format(masterHost, masterPort)
+        System.out.println(akkaUrl)
         try {
-          master = context.actorFor(akkaUrl)
+          master = context.actorSelection(akkaUrl)
           master ! RegisterWorker(workerId, ip, port, cores, memory)
           context.system.eventStream.subscribe(self, classOf[RemotingLifecycleEvent])
-          context.watch(master) // Doesn't work with remote actors, but useful for testing
         } catch {
           case e: Exception =>
             logError("Failed to connect to master", e)

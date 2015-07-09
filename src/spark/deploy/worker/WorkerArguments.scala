@@ -14,7 +14,7 @@ private[spark] class WorkerArguments(args: Array[String]) {
   var webUiPort = 8081
   var cores = inferDefaultCores()
   var memory = inferDefaultMemory()
-  var master: String = "spark://127.0.0.1:7077"
+  var master: String = "spark://192.168.1.104:7077"
   var workDir: String = "D:/spark"
   
   // Check for settings in environment variables 

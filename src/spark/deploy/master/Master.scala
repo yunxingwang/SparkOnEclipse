@@ -88,7 +88,7 @@ private[spark] class Master(ip: String, port: Int,  val conf: SparkConf) extends
           }
         }
         case None =>
-          logWarning("Got status update for unknown executor " + jobId + "/" + execId)
+          logInfo("Got status update for unknown executor " + jobId + "/" + execId)
       }
     }
 

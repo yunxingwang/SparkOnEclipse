@@ -1,13 +1,13 @@
 package spark.util
 import scala.collection.JavaConversions.mapAsJavaMap
-
-import akka.actor.{ActorRef, ActorSystem, ExtendedActorSystem}
+import java.io.File
+import akka.actor.{ ActorRef, ActorRefProvider,ActorSystem,ActorSystemImpl,ExtendedActorSystem }
 import akka.pattern.ask
 
 import com.typesafe.config.ConfigFactory
-import org.apache.log4j.{Level, Logger}
+import org.apache.log4j.{ Level, Logger }
 import spark.rpc.RpcTimeout
-import spark.{Logging, SparkConf, SparkEnv, SparkException}
+import spark.{ Logging, SparkConf, SparkEnv, SparkException }
 
 /**
  * Various utility classes for working with Akka.
@@ -25,31 +25,66 @@ private[spark] object AkkaUtils extends Logging {
    * of a fatal exception. This is used by [[org.apache.spark.executor.Executor]].
    */
   def createActorSystem(
-      name: String,
-      host: String,
-      port: Int,
-      conf: SparkConf): (ActorSystem, Int) = {
-//    val startService: Int => (ActorSystem, Int) = { actualPort =>
-//      doCreateActorSystem(name, host, actualPort, conf)//actualPort对应Int，doCreateActorSystem对应 (ActorSystem, Int) 
-//    }
-//    Utils.startServiceOnPort(port, startService, conf, name)//传一个函数进去的
-    
-    val akkaThreads = System.getProperty("spark.akka.threads", "4").toInt
-    val akkaBatchSize = System.getProperty("spark.akka.batchSize", "15").toInt
-    val akkaConf = ConfigFactory.parseString("""
-      akka.remote.netty.hostname = "%s"
-      akka.remote.netty.port = %d
-      """.format(host, port))
+    name: String,
+    host: String,
+    port: Int,
+    conf: SparkConf): (ActorSystem, Int) = {
+    //    val startService: Int => (ActorSystem, Int) = { actualPort =>
+    //      doCreateActorSystem(name, host, actualPort, conf)//actualPort对应Int，doCreateActorSystem对应 (ActorSystem, Int) 
+    //    }
+    //    Utils.startServiceOnPort(port, startService, conf, name)//传一个函数进去的
+     val akkaThreads = conf.getInt("spark.akka.threads", 4)
+    val akkaBatchSize = conf.getInt("spark.akka.batchSize", 15)
+    val akkaTimeoutS = conf.getTimeAsSeconds("spark.akka.timeout",
+      conf.get("spark.network.timeout", "120s"))
+    val akkaFrameSize = maxFrameSizeBytes(conf)
+    val akkaLogLifecycleEvents = conf.getBoolean("spark.akka.logLifecycleEvents", false)
+    val lifecycleEvents = if (akkaLogLifecycleEvents) "on" else "off"
+    if (!akkaLogLifecycleEvents) {
+      // As a workaround for Akka issue #3787, we coerce the "EndpointWriter" log to be silent.
+      // See: https://www.assembla.com/spaces/akka/tickets/3787#/
+      Option(Logger.getLogger("akka.remote.EndpointWriter")).map(l => l.setLevel(Level.FATAL))
+    }
 
-    val actorSystem = ActorSystem("spark",akkaConf)
-    (actorSystem, port)
+    val logAkkaConfig = if (conf.getBoolean("spark.akka.logAkkaConfig", false)) "on" else "off"
+
+    val akkaHeartBeatPausesS = conf.getTimeAsSeconds("spark.akka.heartbeat.pauses", "6000s")
+    val akkaHeartBeatIntervalS = conf.getTimeAsSeconds("spark.akka.heartbeat.interval", "1000s")
+
+    val akkaConf = ConfigFactory.parseMap(conf.getAkkaConf.toMap[String, String])
+      .withFallback(ConfigFactory.parseString(
+        s"""
+      |akka.daemonic = on
+      |akka.loggers = [""akka.event.slf4j.Slf4jLogger""]
+      |akka.stdout-loglevel = "ERROR"
+      |akka.jvm-exit-on-fatal-error = off
+      |akka.remote.transport-failure-detector.heartbeat-interval = $akkaHeartBeatIntervalS s
+      |akka.remote.transport-failure-detector.acceptable-heartbeat-pause = $akkaHeartBeatPausesS s
+      |akka.actor.provider = "akka.remote.RemoteActorRefProvider"
+      |akka.remote.netty.tcp.transport-class = "akka.remote.transport.netty.NettyTransport"
+      |akka.remote.netty.tcp.hostname = "$host"
+      |akka.remote.netty.tcp.port = $port
+      |akka.remote.netty.tcp.tcp-nodelay = on
+      |akka.remote.netty.tcp.connection-timeout = $akkaTimeoutS s
+      |akka.remote.netty.tcp.maximum-frame-size = ${akkaFrameSize}B
+      |akka.remote.netty.tcp.execution-pool-size = $akkaThreads
+      |akka.actor.default-dispatcher.throughput = $akkaBatchSize
+      |akka.log-config-on-start = $logAkkaConfig
+      |akka.remote.log-remote-lifecycle-events = $lifecycleEvents
+      |akka.log-dead-letters = $lifecycleEvents
+      |akka.log-dead-letters-during-shutdown = $lifecycleEvents
+      """.stripMargin))
+    val actorSystem = ActorSystem(name,akkaConf)
+    val provider = actorSystem.asInstanceOf[ExtendedActorSystem].provider
+    val boundPort = provider.getDefaultAddress.port.get
+    (actorSystem, boundPort)
   }
 
   private def doCreateActorSystem(
-      name: String,
-      host: String,
-      port: Int,
-      conf: SparkConf): (ActorSystem, Int) = {
+    name: String,
+    host: String,
+    port: Int,
+    conf: SparkConf): (ActorSystem, Int) = {
 
     val akkaThreads = conf.getInt("spark.akka.threads", 4)
     val akkaBatchSize = conf.getInt("spark.akka.batchSize", 15)
@@ -69,10 +104,9 @@ private[spark] object AkkaUtils extends Logging {
     val akkaHeartBeatPausesS = conf.getTimeAsSeconds("spark.akka.heartbeat.pauses", "6000s")
     val akkaHeartBeatIntervalS = conf.getTimeAsSeconds("spark.akka.heartbeat.interval", "1000s")
 
-
     val akkaConf = ConfigFactory.parseMap(conf.getAkkaConf.toMap[String, String])
       .withFallback(ConfigFactory.parseString(
-      s"""
+        s"""
       |akka.daemonic = on
       |akka.loggers = [""akka.event.slf4j.Slf4jLogger""]
       |akka.stdout-loglevel = "ERROR"
@@ -120,9 +154,9 @@ private[spark] object AkkaUtils extends Logging {
    * throw a SparkException if this fails.
    */
   def askWithReply[T](
-      message: Any,
-      actor: ActorRef,
-      timeout: RpcTimeout): T = {
+    message: Any,
+    actor: ActorRef,
+    timeout: RpcTimeout): T = {
     askWithReply[T](message, actor, maxAttempts = 1, retryInterval = Int.MaxValue, timeout)
   }
 
@@ -131,11 +165,11 @@ private[spark] object AkkaUtils extends Logging {
    * throw a SparkException if this fails even after the specified number of retries.
    */
   def askWithReply[T](
-      message: Any,
-      actor: ActorRef,
-      maxAttempts: Int,
-      retryInterval: Long,
-      timeout: RpcTimeout): T = {
+    message: Any,
+    actor: ActorRef,
+    maxAttempts: Int,
+    retryInterval: Long,
+    timeout: RpcTimeout): T = {
     // TODO: Consider removing multiple attempts
     if (actor == null) {
       throw new SparkException(s"Error sending message [message = $message]" +
@@ -178,11 +212,11 @@ private[spark] object AkkaUtils extends Logging {
   }
 
   def makeExecutorRef(
-      name: String,
-      conf: SparkConf,
-      host: String,
-      port: Int,
-      actorSystem: ActorSystem): ActorRef = {
+    name: String,
+    conf: SparkConf,
+    host: String,
+    port: Int,
+    actorSystem: ActorSystem): ActorRef = {
     val executorActorSystemName = SparkEnv.executorActorSystemName
     val url = address(protocol(actorSystem), executorActorSystemName, host, port, name)
     val timeout = RpcUtils.lookupRpcTimeout(conf)
@@ -205,11 +239,11 @@ private[spark] object AkkaUtils extends Logging {
   }
 
   def address(
-      protocol: String,
-      systemName: String,
-      host: String,
-      port: Int,
-      actorName: String): String = {
+    protocol: String,
+    systemName: String,
+    host: String,
+    port: Int,
+    actorName: String): String = {
     s"$protocol://$systemName@$host:$port/user/$actorName"
   }
 

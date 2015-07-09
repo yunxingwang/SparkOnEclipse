@@ -39,7 +39,7 @@ private[spark] class Client(
     override def preStart() {
       val Seq(masterHost, masterPort) = MASTER_REGEX.unapplySeq(masterUrl).get
       logInfo("Connecting to master spark://" + masterHost + ":" + masterPort)
-      val akkaUrl = "akka://spark@%s:%s/user/Master".format(masterHost, masterPort)
+      val akkaUrl = "akka.tcp://spark@%s:%s/user/Master".format(masterHost, masterPort)
       try {
         master = context.actorFor(akkaUrl)
         master ! RegisterJob(jobDescription)
