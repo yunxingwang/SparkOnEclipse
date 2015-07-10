@@ -33,18 +33,17 @@ private[spark] class Client(
   }
 
   class ClientActor extends Actor with Logging {
-    var master: ActorRef = null
+    var master: ActorSelection = null
     var alreadyDisconnected = false  // To avoid calling listener.disconnected() multiple times
 
     override def preStart() {
       val Seq(masterHost, masterPort) = MASTER_REGEX.unapplySeq(masterUrl).get
-      logInfo("Connecting to master spark://" + masterHost + ":" + masterPort)
+      logInfo("Client Connecting to master spark://" + masterHost + ":" + masterPort)
       val akkaUrl = "akka.tcp://spark@%s:%s/user/Master".format(masterHost, masterPort)
       try {
-        master = context.actorFor(akkaUrl)
+        master = context.actorSelection(akkaUrl)
         master ! RegisterJob(jobDescription)
         context.system.eventStream.subscribe(self, classOf[RemotingLifecycleEvent])
-        context.watch(master)  // Doesn't work with remote actors, but useful for testing
       } catch {
         case e: Exception =>
           logError("Failed to connect to master", e)

@@ -74,7 +74,7 @@ private[spark] class ExecutorRunner(
 
   def buildCommandSeq(): Seq[String] = {
     val command = jobDesc.command
-    val script = if (System.getProperty("os.name").startsWith("Windows")) "run.cmd" else "run";
+    val script = if (System.getProperty("os.name").startsWith("Windows")) "run.bat" else "run";
     val runScript = new File(sparkHome, script).getCanonicalPath
     Seq(runScript, command.mainClass) ++ command.arguments.map(substituteVariables)
   }
@@ -119,6 +119,24 @@ private[spark] class ExecutorRunner(
       }
       env.put("SPARK_CORES", cores.toString)
       env.put("SPARK_MEMORY", memory.toString)
+      env.remove("COMMONPROGRAMFILES")
+      env.remove("PATH")
+      env.remove("PROGRAMW6432")
+      env.remove("COMMONPROGRAMFILES(X86)")
+      env.remove("PROGRAMFILES(X86)")
+      env.remove("PROCESSOR_IDENTIFIER")
+      env.remove("PROGRAMFILES")
+      env.remove("Path")
+      env.remove("CommonProgramFiles")
+      env.remove("VS100COMNTOOLS")
+      env.remove("NLS_LANG")
+      env.remove("ProgramFiles(x86)")
+      env.remove("ProgramFiles")
+      env.remove("ProgramW6432")
+      env.remove("CommonProgramW6432")
+      env.remove("CommonProgramFiles(x86)")
+      env.put("PATH","D:/Java/jdk1.7.0_67/jre/bin;D:/scala/bin")
+      println(env)
       // In case we are running this from within the Spark Shell, avoid creating a "scala"
       // parent process for the executor command
       env.put("SPARK_LAUNCH_WITH_SCALA", "0")

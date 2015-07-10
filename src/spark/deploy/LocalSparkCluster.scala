@@ -28,7 +28,7 @@ class LocalSparkCluster(numSlaves: Int, coresPerSlave: Int, memoryPerSlave: Int)
     logInfo("Starting a local Spark cluster with " + numSlaves + " slaves.")
     val conf=new SparkConf
     /* Start the Master */
-    val (actorSystem, masterPort) = AkkaUtils.createActorSystem("sparkMaster", localIpAddress, 7080, conf)
+    val (actorSystem, masterPort) = AkkaUtils.createActorSystem("spark", localIpAddress, 7080, conf)
     masterActorSystem = actorSystem
     masterUrl = "spark://" + localIpAddress + ":" + masterPort
     val actor = masterActorSystem.actorOf(
@@ -38,7 +38,7 @@ class LocalSparkCluster(numSlaves: Int, coresPerSlave: Int, memoryPerSlave: Int)
     /* Start the Slaves */
     for (slaveNum <- 1 to numSlaves) {
       val (actorSystem, boundPort) = 
-        AkkaUtils.createActorSystem("sparkWorker" + slaveNum, localIpAddress, 7081+slaveNum,conf)
+        AkkaUtils.createActorSystem("spark" + slaveNum, localIpAddress, 7081+slaveNum,conf)
       slaveActorSystems += actorSystem
       val actor = actorSystem.actorOf(
         Props(new Worker(localIpAddress, boundPort, coresPerSlave, memoryPerSlave, masterUrl)),

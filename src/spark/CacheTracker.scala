@@ -106,7 +106,7 @@ private[spark] class CacheTracker(actorSystem: ActorSystem, isMaster: Boolean)
     logInfo("Registered CacheTrackerActor actor")
     actor
   } else {
-    val url = "akka://spark@%s:%s/user/%s".format(ip, port, actorName)
+    val url = "akka.tcp://spark@%s:%s/user/%s".format(ip, port, actorName)
     actorSystem.actorFor(url)
   }
 

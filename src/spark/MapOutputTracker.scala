@@ -60,7 +60,7 @@ private[spark] class MapOutputTracker(actorSystem: ActorSystem, isMaster: Boolea
     logInfo("Registered MapOutputTrackerActor actor")
     actor
   } else {
-    val url = "akka://spark@%s:%s/user/%s".format(ip, port, actorName)
+    val url = "akka.tcp://spark@%s:%s/user/%s".format(ip, port, actorName)
     actorSystem.actorFor(url)
   }
 

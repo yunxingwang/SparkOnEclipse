@@ -34,7 +34,7 @@ private[spark] class SparkDeploySchedulerBackend(
   override def start() {
     super.start()
 
-    val masterUrl = "akka://spark@%s:%s/user/%s".format(
+    val masterUrl = "akka.tcp://spark@%s:%s/user/%s".format(
       System.getProperty("spark.master.host"), System.getProperty("spark.master.port"),
       StandaloneSchedulerBackend.ACTOR_NAME)
     val args = Seq(masterUrl, "{{SLAVEID}}", "{{HOSTNAME}}", "{{CORES}}")
