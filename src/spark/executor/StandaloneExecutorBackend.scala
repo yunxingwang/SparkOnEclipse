@@ -68,7 +68,7 @@ private[spark] object StandaloneExecutorBackend {
     // Create a new ActorSystem to run the backend, because we can't create a SparkEnv / Executor
     // before getting started with all our system properties, etc
     val conf = new SparkConf
-    val (actorSystem, boundPort) = AkkaUtils.createActorSystem("sparkExecutor", hostname, 0,conf)
+    val (actorSystem, boundPort) = AkkaUtils.createActorSystem("sparkExecutor", hostname, 7888,conf)
     val actor = actorSystem.actorOf(
       Props(new StandaloneExecutorBackend(new Executor, masterUrl, slaveId, hostname, cores)),
       name = "Executor")

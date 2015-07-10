@@ -35,9 +35,18 @@ set REPL_DIR=%FWDIR%repl
 set EXAMPLES_DIR=%FWDIR%examples
 set BAGEL_DIR=%FWDIR%bagel
 
+
 rem Build up classpath
-set CLASSPATH=%SPARK_CLASSPATH%;%MESOS_CLASSPATH%;%FWDIR%bin;%FWDIR%lib;%CORE_DIR%\target\scala-%SCALA_VERSION%\classes
-set CLASSPATH=%CLASSPATH%;%CORE_DIR%\target\scala-%SCALA_VERSION%\test-classes;%CORE_DIR%\src\main\resources
+set CLASSPATH=%SPARK_CLASSPATH%;%MESOS_CLASSPATH%;%FWDIR%bin;%FWDIR%lib
+set CLASSPATH=%CLASSPATH%;D:\workspace\SparkOnWindows\lib\slf4j-api-1.7.12.jar
+set CLASSPATH=%CLASSPATH%;D:\workspace\SparkOnWindows\lib\akka-actor_2.10-2.3.11.jar;D:\workspace\SparkOnWindows\lib\akka-remote_2.10-2.3.11.jar
+set CLASSPATH=%CLASSPATH%;D:\workspace\SparkOnWindows\lib\akka-slf4j_2.10-2.3.11.jar;D:\workspace\SparkOnWindows\lib\asm-all-3.3.1.jar
+set CLASSPATH=%CLASSPATH%;D:\workspace\SparkOnWindows\lib\colt-1.2.0.jar;D:\workspace\SparkOnWindows\lib\compress-lzf-1.0.0.jar
+set CLASSPATH=%CLASSPATH%;D:\workspace\SparkOnWindows\lib\config-1.2.1.jar;D:\workspace\SparkOnWindows\lib\fastutil-7.0.6.jar
+set CLASSPATH=%CLASSPATH%;D:\workspace\SparkOnWindows\lib\guava-11.0.1.jar;D:\workspace\SparkOnWindows\lib\log4j-1.2.16.jar
+set CLASSPATH=%CLASSPATH%;D:\workspace\SparkOnWindows\lib\netty-3.8.0.Final.jar;D:\workspace\SparkOnWindows\lib\protobuf-java-2.5.0.jar
+set CLASSPATH=%CLASSPATH%;D:\workspace\SparkOnWindows\lib\slf4j-log4j12-1.7.12.jar
+set CLASSPATH=%CLASSPATH%;%CORE_DIR%\target\scala-%SCALA_VERSION%\test-classes;%CORE_DIR%\src\main\resources;%CORE_DIR%\target\scala-%SCALA_VERSION%\classes
 set CLASSPATH=%CLASSPATH%;%REPL_DIR%\target\scala-%SCALA_VERSION%\classes;%EXAMPLES_DIR%\target\scala-%SCALA_VERSION%\classes
 for /R "%FWDIR%\lib_managed\jars" %%j in (*.jar) do set CLASSPATH=!CLASSPATH!;%%j
 for /R "%FWDIR%\lib_managed\bundles" %%j in (*.jar) do set CLASSPATH=!CLASSPATH!;%%j
@@ -62,17 +71,10 @@ if "%SPARK_LAUNCH_WITH_SCALA%" NEQ 1 goto java_runner
   rem The JVM doesn't read JAVA_OPTS by default so we need to pass it in
   set EXTRA_ARGS=%JAVA_OPTS%
 :run_spark
-set RUNNER=%SCALA_HOME%\bin\scala
+ set RUNNER=java
 echo %RUNNER%
-set CLASSPATH=%CLASSPATH%;D:\workspace\SparkOnWindows\lib\slf4j-api-1.7.12.jar;D:\workspace\SparkOnWindows\lib\slf4j-simple-1.7.12.jar
-set CLASSPATH=%CLASSPATH%;D:\workspace\SparkOnWindows\lib\akka-actor_2.10-2.3.11.jar;D:\workspace\SparkOnWindows\lib\akka-remote_2.10-2.3.11.jar
-set CLASSPATH=%CLASSPATH%;D:\workspace\SparkOnWindows\lib\akka-slf4j_2.10-2.3.11.jar;D:\workspace\SparkOnWindows\lib\asm-all-3.3.1.jar
-set CLASSPATH=%CLASSPATH%;D:\workspace\SparkOnWindows\lib\colt-1.2.0.jar;D:\workspace\SparkOnWindows\lib\compress-lzf-1.0.0.jar
-set CLASSPATH=%CLASSPATH%;D:\workspace\SparkOnWindows\lib\config-1.2.1.jar;D:\workspace\SparkOnWindows\lib\fastutil-7.0.6.jar
-set CLASSPATH=%CLASSPATH%;D:\workspace\SparkOnWindows\lib\guava-11.0.1.jar;D:\workspace\SparkOnWindows\lib\log4j-1.2.16.jar
-set CLASSPATH=%CLASSPATH%;D:\workspace\SparkOnWindows\lib\netty-3.8.0.Final.jar;D:\workspace\SparkOnWindows\lib\protobuf-java-2.5.0.jar
-set CLASSPATH=%CLASSPATH%;D:\workspace\SparkOnWindows\lib\slf4j-log4j12-1.7.12.jar
-
+ set CLASSPATH=%CLASSPATH%;%SCALA_HOME%\lib\scala-library.jar;%SCALA_HOME%\lib\scala-compiler.jar;%SCALA_HOME%\lib\jline.jar
+ 
 echo %CLASSPATH%
 echo %*
 %RUNNER% -cp "%CLASSPATH%" %EXTRA_ARGS% %*
